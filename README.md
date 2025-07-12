@@ -42,4 +42,4 @@ Data analysis project using open data from Icelandic sources to build interactiv
 ## 📬 Let's connect
 
 - Email: **moises.aponte@gmail.com**
-- LinkedIn: *(add your link here if ya lo tienes listo)*
+
