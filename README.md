@@ -28,8 +28,7 @@ Automation script to generate daily reports for client follow-up — inspired by
 Data analysis project using open data from Icelandic sources to build interactive dashboards.
 
 ## 📈 My Goals
-
-- Land my first role as a software developer in the next 90 days  
+  
 - Keep building public, useful projects that show my thinking and evolution  
 - Join a mission-driven team where I can grow technically and contribute meaningfully
 
