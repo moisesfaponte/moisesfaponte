@@ -1,87 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import productsData from '@/lib/products-data.json'
 import type { ProductWithPrices, PriceEntry } from '@/lib/types'
+
+type RawProduct = (typeof productsData)[number]
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const query = (searchParams.get('q') ?? '').trim()
+  const query = (searchParams.get('q') ?? '').trim().toLowerCase()
   const islandId = searchParams.get('island') ?? 'gran-canaria'
 
   if (!query) {
-    return NextResponse.json({ products: [], island: { id: islandId }, total: 0 })
+    return NextResponse.json({ products: [], total: 0 })
   }
 
-  try {
-    const products = await prisma.product.findMany({
-      where: {
-        OR: [
-          { name: { contains: query } },
-          { category: { contains: query } },
-          { brand: { contains: query } },
-        ],
-      },
-      include: {
-        prices: {
-          include: {
-            store: {
-              include: {
-                supermarket: true,
-                island: true,
-              },
-            },
-          },
-          where: {
-            store: {
-              islandId,
-            },
-          },
-        },
-      },
-      take: 30,
+  const matched = (productsData as RawProduct[]).filter(
+    (p) =>
+      p.name.toLowerCase().includes(query) ||
+      p.category.toLowerCase().includes(query) ||
+      (p.brand ?? '').toLowerCase().includes(query)
+  )
+
+  const result: ProductWithPrices[] = matched
+    .map((p) => {
+      const islandPrices = p.prices.filter((pr) => pr.islandId === islandId)
+      if (islandPrices.length === 0) return null
+
+      const minPrice = Math.min(...islandPrices.map((e) => e.price))
+      const maxPrice = Math.max(...islandPrices.map((e) => e.price))
+
+      const entries: PriceEntry[] = islandPrices.map((pr) => ({
+        supermarketId: pr.supermarketId,
+        supermarketName: pr.supermarketName,
+        supermarketColor: pr.supermarketColor,
+        islandId: pr.islandId,
+        price: pr.price,
+        isCheapest: pr.price === minPrice,
+      }))
+
+      return {
+        id: p.id,
+        name: p.name,
+        brand: p.brand,
+        category: p.category,
+        unit: p.unit,
+        imageEmoji: p.imageEmoji,
+        prices: entries,
+        cheapestPrice: minPrice,
+        mostExpensivePrice: maxPrice,
+        savings: Math.round((maxPrice - minPrice) * 100) / 100,
+      } satisfies ProductWithPrices
     })
+    .filter(Boolean) as ProductWithPrices[]
 
-    const result: ProductWithPrices[] = products
-      .filter((p) => p.prices.length > 0)
-      .map((p) => {
-        const priceEntries: PriceEntry[] = p.prices.map((pr) => ({
-          supermarketId: pr.store.supermarket.id,
-          supermarketName: pr.store.supermarket.name,
-          supermarketColor: pr.store.supermarket.color,
-          islandId: pr.store.island.id,
-          price: pr.price,
-          isCheapest: false,
-        }))
-
-        const minPrice = Math.min(...priceEntries.map((e) => e.price))
-        const maxPrice = Math.max(...priceEntries.map((e) => e.price))
-
-        priceEntries.forEach((e) => {
-          e.isCheapest = e.price === minPrice
-        })
-
-        return {
-          id: p.id,
-          name: p.name,
-          brand: p.brand,
-          category: p.category,
-          unit: p.unit,
-          imageEmoji: p.imageEmoji,
-          prices: priceEntries,
-          cheapestPrice: minPrice,
-          mostExpensivePrice: maxPrice,
-          savings: Math.round((maxPrice - minPrice) * 100) / 100,
-        }
-      })
-
-    const island = await prisma.island.findUnique({ where: { id: islandId } })
-
-    return NextResponse.json({
-      products: result,
-      island,
-      total: result.length,
-    })
-  } catch (error) {
-    console.error('Search error:', error)
-    return NextResponse.json({ error: 'Error al buscar productos' }, { status: 500 })
-  }
+  return NextResponse.json({ products: result, total: result.length })
 }

@@ -7,6 +7,10 @@ const nextConfig = {
       { hostname: 'www.lidl.es' },
     ],
   },
+  // Required to import large JSON files in API routes
+  experimental: {
+    serverComponentsExternalPackages: [],
+  },
 }
 
 export default nextConfig
